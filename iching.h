@@ -1,9 +1,9 @@
 #ifndef ICHING_H
 #define ICHING_H
 
-typedef struct {
+typedef struct Hexagram {
     int index;
-    unsigned long long int binary_representation;
+    unsigned char binary_representation;
 } Hexagram;
 
 extern const Hexagram iching[];

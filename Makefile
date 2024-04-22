@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -pthread
 TARGET = iching 
-SRCS = main.c
+SRCS = main.c iching.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean
