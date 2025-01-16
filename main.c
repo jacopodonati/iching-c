@@ -19,12 +19,14 @@
 #include "iching.h"
 #include <fcntl.h>
 #include <getopt.h>
+#include <locale.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+#include <wchar.h>
 
 /***
  * Qui definiamo alcune costanti basilari: tre monete, sei lanci.
@@ -62,8 +64,12 @@ typedef struct Response {
  * vedrà più avanti.  In alcuni casi, come durante la programmazione, è
  * invece più utile avere far sì che tutti e sei i lanci avvengano senza
  * interazione con l'utente.
+ * 
+ * La seconda opzione, `--unicode`, permette di visualizzare nel responso
+ * l'esagramma in forma unicode.  Per certi versi è un semplice vezzo in quanto
+ * il carattere è minuscolo e difficilmente leggibile.
  *
- * La seconda opzione, `--verbose`, aumenta la verbosità dell'output.
+ * La terza opzione, `--verbose`, aumenta la verbosità dell'output.
  * Nelle mie intenzioni l'unico output dovrebbe essere il responso
  * finale con le eventuali linee mutate (per esempio, 53.2.3.6).  Non
  * sempre questo è il comportamento desiderato, specialmente quando si
@@ -76,6 +82,7 @@ typedef struct Response {
 
 typedef struct Options {
   int no_wait;
+  int unicode;
   int verbose;
 } Options;
 
@@ -253,17 +260,22 @@ char *get_variation(unsigned char beginning, unsigned char end) {
  */
 
 int main(int argc, char *argv[]) {
-  Options options = {0, 0};
+  setlocale(LC_ALL, "");
+  Options options = {0, 0, 0};
   int option;
 
   static struct option long_options[] = {{"no-wait", no_argument, 0, 'w'},
+                                         {"unicode", no_argument, 0, 'u'},
                                          {"verbose", no_argument, 0, 'v'},
                                          {0, 0, 0, 0}};
 
-  while ((option = getopt_long(argc, argv, "wv", long_options, NULL)) != -1) {
+  while ((option = getopt_long(argc, argv, "wuv", long_options, NULL)) != -1) {
     switch (option) {
     case 'w':
       options.no_wait = 1;
+      break;
+    case 'u':
+      options.unicode = 1;
       break;
     case 'v':
       options.verbose = 1;
@@ -312,13 +324,24 @@ int main(int argc, char *argv[]) {
 
   response = split_hex(response);
   int beginning_number = get_hexagram_number(response.beginning);
+  int beginning_hex = 0x4DBF + beginning_number;
   if (response.beginning != response.end) {
     int end_number = get_hexagram_number(response.end);
+    int end_hex = 0x4DBF + end_number;
     char *diff_bits = get_variation(response.beginning, response.end);
-    printf("%d%s -> %d\n", beginning_number, diff_bits, end_number);
+    if (options.unicode) {
+      wprintf(L"%lc %d%s -> %lc %d\n", (wchar_t)(beginning_hex),
+              beginning_number, diff_bits, (wchar_t)(end_hex), end_number);
+    } else {
+      printf("%d%s -> %d\n", beginning_number, diff_bits, end_number);
+    }
     free(diff_bits);
   } else {
-    printf("%d\n", beginning_number);
+    if (options.unicode) {
+      wprintf(L"%lc %d\n", (wchar_t)(beginning_hex), beginning_number);
+    } else {
+      printf("%d\n", beginning_number);
+    }
   }
 
   return 0;
