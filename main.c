@@ -64,10 +64,10 @@ typedef struct Response {
  * vedrà più avanti.  In alcuni casi, come durante la programmazione, è
  * invece più utile avere far sì che tutti e sei i lanci avvengano senza
  * interazione con l'utente.
- * 
+ *
  * La seconda opzione, `--unicode`, permette di visualizzare nel responso
- * l'esagramma in forma unicode.  Per certi versi è un semplice vezzo in quanto
- * il carattere è minuscolo e difficilmente leggibile.
+ * l'esagramma in forma unicode.  Per certi versi è un semplice vezzo in
+ * quanto il carattere è minuscolo e difficilmente leggibile.
  *
  * La terza opzione, `--verbose`, aumenta la verbosità dell'output.
  * Nelle mie intenzioni l'unico output dovrebbe essere il responso
