@@ -16,15 +16,15 @@
  * passaggi e che perciò sarebbe più facilmente realizzabile.  È però
  * meno utilizzabile da terminale.)
  */
+#include "iching.h"
+#include <fcntl.h>
+#include <getopt.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
-#include <unistd.h>
-#include <time.h>
-#include <getopt.h>
 #include <termios.h>
-#include <fcntl.h>
-#include "iching.h"
+#include <time.h>
+#include <unistd.h>
 
 /***
  * Qui definiamo alcune costanti basilari: tre monete, sei lanci.
@@ -42,11 +42,10 @@
  * offerto da C contiene 8 bit.  A noi ne servirebbero solamente 6.
  */
 
-typedef struct Response
-{
-    char raw[THROWS];
-    unsigned char beginning;
-    unsigned char end;
+typedef struct Response {
+  char raw[THROWS];
+  unsigned char beginning;
+  unsigned char end;
 } Response;
 
 /***
@@ -75,10 +74,9 @@ typedef struct Response
  * somme e aspettando come output il responso.
  */
 
-typedef struct Options
-{
-    int no_wait;
-    int verbose;
+typedef struct Options {
+  int no_wait;
+  int verbose;
 } Options;
 
 /***
@@ -87,16 +85,14 @@ typedef struct Options
  * principale e singoli thread.
  */
 
-typedef struct ThreadData
-{
-    int thread_id;
-    int result;
+typedef struct ThreadData {
+  int thread_id;
+  int result;
 } ThreadData;
 
-typedef struct ThreadParams
-{
-    ThreadData thread_data;
-    Options options;
+typedef struct ThreadParams {
+  ThreadData thread_data;
+  Options options;
 } ThreadParams;
 
 /***
@@ -106,26 +102,24 @@ typedef struct ThreadParams
  * funzione, pur facendo il suo mestiere, non è perfetta perché non
  * permette l'utilizzo di tasti come SHIFT, CTRL, ALT, ecc.
  */
-int kbhit()
-{
-    struct termios oldt, newt;
-    int ch;
+int kbhit() {
+  struct termios oldt, newt;
+  int ch;
 
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    ch = getchar();
+  tcgetattr(STDIN_FILENO, &oldt);
+  newt = oldt;
+  newt.c_lflag &= ~(ICANON | ECHO);
+  tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+  ch = getchar();
 
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+  tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 
-    if (ch != EOF)
-    {
-        ungetc(ch, stdin);
-        return 1;
-    }
+  if (ch != EOF) {
+    ungetc(ch, stdin);
+    return 1;
+  }
 
-    return 0;
+  return 0;
 }
 
 /***
@@ -145,25 +139,23 @@ int kbhit()
  * impostato l'opzione `--verbose` al lancio del programma.
  */
 
-void *throw_a_coin(void *arg)
-{
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    time_t timestamp = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+void *throw_a_coin(void *arg) {
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  time_t timestamp = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 
-    ThreadParams *params = (ThreadParams *)arg;
-    ThreadData *data = &(params->thread_data);
-    Options *options = &(params->options);
+  ThreadParams *params = (ThreadParams *)arg;
+  ThreadData *data = &(params->thread_data);
+  Options *options = &(params->options);
 
-    int random_number = rand() % 2 + 2;
+  int random_number = rand() % 2 + 2;
 
-    if (options->verbose)
-    {
-        printf("%lld: %d\n", (long long)timestamp, random_number);
-    }
+  if (options->verbose) {
+    printf("%lld: %d\n", (long long)timestamp, random_number);
+  }
 
-    data->result = random_number;
-    pthread_exit(NULL);
+  data->result = random_number;
+  pthread_exit(NULL);
 }
 
 /***
@@ -171,20 +163,18 @@ void *throw_a_coin(void *arg)
  * a partire dalla sua rappresentazione binaria.
  */
 
-void print_binary(unsigned char hex)
-{
-    int number_of_bits = 6;
-    unsigned char mask = 1 << (number_of_bits - 1);
+void print_binary(unsigned char hex) {
+  int number_of_bits = 6;
+  unsigned char mask = 1 << (number_of_bits - 1);
 
-    for (int i = 0; i < number_of_bits; i++)
-    {
-        if (hex & mask)
-            printf("1");
-        else
-            printf("0");
-        mask >>= 1;
-    }
-    printf("\n");
+  for (int i = 0; i < number_of_bits; i++) {
+    if (hex & mask)
+      printf("1");
+    else
+      printf("0");
+    mask >>= 1;
+  }
+  printf("\n");
 }
 
 /***
@@ -194,37 +184,34 @@ void print_binary(unsigned char hex)
  * e quello relativo, o secondario.
  */
 
-Response split_hex(Response response)
-{
-    response.beginning = 0b000000;
-    response.end = 0b000000;
-    for (int i = 5; i >= 0; i--)
-    {
-        switch (response.raw[i])
-        {
-        case 6:
-            response.beginning |= (0b0 << (5 - i));
-            response.end |= (0b1 << (5 - i));
-            break;
-        case 7:
-            response.beginning |= (0b1 << (5 - i));
-            response.end |= (0b1 << (5 - i));
-            break;
-        case 8:
-            response.beginning &= ~(0b1 << (5 - i));
-            response.end &= ~(0b1 << (5 - i));
-            break;
-        case 9:
-            response.beginning |= (0b1 << (5 - i));
-            response.end &= ~(0b1 << (5 - i));
-            break;
-        default:
-            fprintf(stderr, "Error: invalid character.\n");
-            break;
-        }
+Response split_hex(Response response) {
+  response.beginning = 0b000000;
+  response.end = 0b000000;
+  for (int i = 5; i >= 0; i--) {
+    switch (response.raw[i]) {
+    case 6:
+      response.beginning |= (0b0 << (5 - i));
+      response.end |= (0b1 << (5 - i));
+      break;
+    case 7:
+      response.beginning |= (0b1 << (5 - i));
+      response.end |= (0b1 << (5 - i));
+      break;
+    case 8:
+      response.beginning &= ~(0b1 << (5 - i));
+      response.end &= ~(0b1 << (5 - i));
+      break;
+    case 9:
+      response.beginning |= (0b1 << (5 - i));
+      response.end &= ~(0b1 << (5 - i));
+      break;
+    default:
+      fprintf(stderr, "Error: invalid character.\n");
+      break;
     }
+  }
 
-    return response;
+  return response;
 }
 
 /***
@@ -232,123 +219,107 @@ Response split_hex(Response response)
  * il numero dell'esagramma.
  */
 
-int get_hexagram_number(unsigned char binary_hex)
-{
-    for (int i = 0; i < 64; i++)
-    {
-        if (iching[i].binary_representation == binary_hex)
-        {
-            return iching[i].index;
-        }
+int get_hexagram_number(unsigned char binary_hex) {
+  for (int i = 0; i < 64; i++) {
+    if (iching[i].binary_representation == binary_hex) {
+      return iching[i].index;
     }
-    return -1;
+  }
+  return -1;
 }
 
 /***
  * Questa funzione ha lo scopo di capire quali sono le differenze tra
  * due esagrammi.  Per comodità costruisce una stringa in cui sono
  * indicate le singole linee mutanti.
-*/
+ */
 
-char *get_variation(unsigned char beginning, unsigned char end)
-{
-    char* diff_bits_str = malloc(THROWS * 3 * sizeof(char));
-    int index = 0;
-    for (int i = 0; i < THROWS; i++) {
-        unsigned char mask = 1 << i;
-        if ((beginning & mask) != (end & mask)) {
-            diff_bits_str[index++] = '.';
-            diff_bits_str[index++] = (i + 1) + '0';
-        }
+char *get_variation(unsigned char beginning, unsigned char end) {
+  char *diff_bits_str = malloc(THROWS * 3 * sizeof(char));
+  int index = 0;
+  for (int i = 0; i < THROWS; i++) {
+    unsigned char mask = 1 << i;
+    if ((beginning & mask) != (end & mask)) {
+      diff_bits_str[index++] = '.';
+      diff_bits_str[index++] = (i + 1) + '0';
     }
-    diff_bits_str[index] = '\0';
-    return diff_bits_str;
+  }
+  diff_bits_str[index] = '\0';
+  return diff_bits_str;
 }
 
 /**
  * E poi si inizia...
  */
 
-int main(int argc, char *argv[])
-{
-    Options options = {0, 0};
-    int option;
+int main(int argc, char *argv[]) {
+  Options options = {0, 0};
+  int option;
 
-    static struct option long_options[] = {
-        {"no-wait", no_argument, 0, 'w'},
-        {"verbose", no_argument, 0, 'v'},
-        {0, 0, 0, 0}};
+  static struct option long_options[] = {{"no-wait", no_argument, 0, 'w'},
+                                         {"verbose", no_argument, 0, 'v'},
+                                         {0, 0, 0, 0}};
 
-    while ((option = getopt_long(argc, argv, "wv", long_options, NULL)) != -1)
-    {
-        switch (option)
-        {
-        case 'w':
-            options.no_wait = 1;
-            break;
-        case 'v':
-            options.verbose = 1;
-            break;
-        case '?':
-            fprintf(stderr, "Opzione non riconosciuta\n");
-            exit(EXIT_FAILURE);
-        default:
-            abort();
-        }
+  while ((option = getopt_long(argc, argv, "wv", long_options, NULL)) != -1) {
+    switch (option) {
+    case 'w':
+      options.no_wait = 1;
+      break;
+    case 'v':
+      options.verbose = 1;
+      break;
+    case '?':
+      fprintf(stderr, "Opzione non riconosciuta\n");
+      exit(EXIT_FAILURE);
+    default:
+      abort();
+    }
+  }
+
+  pthread_t threads[COINS];
+  ThreadParams thread_params[COINS];
+
+  srand(time(NULL));
+  Response response;
+
+  for (int i = 0; i < THROWS; i++) {
+    if (!options.no_wait) {
+      while (!kbhit()) {
+      }
+      getchar();
     }
 
-    pthread_t threads[COINS];
-    ThreadParams thread_params[COINS];
+    int sum = 0;
 
-    srand(time(NULL));
-    Response response;
-
-    for (int i = 0; i < THROWS; i++)
-    {
-        if (!options.no_wait)
-        {
-            while (!kbhit())
-            {
-            }
-            getchar();
-        }
-
-        int sum = 0;
-
-        for (int j = 0; j < COINS; j++)
-        {
-            thread_params[j].thread_data.thread_id = j;
-            thread_params[j].options = options;
-            pthread_create(&threads[j], NULL, throw_a_coin, (void *)&thread_params[j]);
-        }
-
-        for (int j = 0; j < COINS; j++)
-        {
-            pthread_join(threads[j], NULL);
-            sum += thread_params[j].thread_data.result;
-        }
-
-        response.raw[i] = sum;
-
-        if (options.verbose)
-        {
-            printf("La somma è: %d\n\n", sum);
-        }
+    for (int j = 0; j < COINS; j++) {
+      thread_params[j].thread_data.thread_id = j;
+      thread_params[j].options = options;
+      pthread_create(&threads[j], NULL, throw_a_coin,
+                     (void *)&thread_params[j]);
     }
 
-    response = split_hex(response);
-    int beginning_number = get_hexagram_number(response.beginning);
-    if (response.beginning != response.end)
-    {
-        int end_number = get_hexagram_number(response.end);
-        char *diff_bits = get_variation(response.beginning, response.end);
-        printf("%d%s -> %d\n", beginning_number, diff_bits, end_number);
-        free(diff_bits);
-    }
-    else
-    {
-        printf("%d\n", beginning_number);
+    for (int j = 0; j < COINS; j++) {
+      pthread_join(threads[j], NULL);
+      sum += thread_params[j].thread_data.result;
     }
 
-    return 0;
+    response.raw[i] = sum;
+
+    if (options.verbose) {
+      printf("La somma è: %d\n\n", sum);
+    }
+  }
+
+  response = split_hex(response);
+  int beginning_number = get_hexagram_number(response.beginning);
+  if (response.beginning != response.end) {
+    int end_number = get_hexagram_number(response.end);
+    char *diff_bits = get_variation(response.beginning, response.end);
+    printf("%d%s -> %d\n", beginning_number, diff_bits, end_number);
+    free(diff_bits);
+  } else {
+    printf("%d\n", beginning_number);
+  }
+
+  return 0;
 }

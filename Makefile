@@ -1,4 +1,4 @@
-CC = gcc
+CC = clang
 CFLAGS = -Wall -Wextra -pthread
 TARGET = iching 
 SRCS = main.c iching.c
