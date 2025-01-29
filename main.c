@@ -107,20 +107,21 @@ typedef struct Response {
  * l'esagramma in forma unicode.  Per certi versi è un semplice vezzo in
  * quanto il carattere è minuscolo e difficilmente leggibile.
  *
- * La terza opzione, `--verbose`, aumenta la verbosità dell'output.
+ * La terza opzione è `--lookup` e permette di bypassare l'interrogazione
+ * dell'oracolo fornendo come input le sei somme e aspettando come output
+ * il responso.  Ovviamente, è utilizzabile assieme a `--unicode`.
+ *
+ * La quarta opzione, `--verbose`, aumenta la verbosità dell'output.
  * Nelle mie intenzioni l'unico output dovrebbe essere il responso
  * finale con le eventuali linee mutate (per esempio, 53.2.3.6).  Non
  * sempre questo è il comportamento desiderato, specialmente quando si
  * sta scrivendo il codice.
- *
- * L'ultima opzione, non ancora implementata, è `--lookup` e permette di
- * bypassare l'interrogazione dell'oracolo fornendo come input le sei
- * somme e aspettando come output il responso.
  */
 
 typedef struct Options {
   int no_wait;
   int unicode;
+  int lookup;
   int verbose;
 } Options;
 
@@ -299,11 +300,12 @@ char *get_variation(unsigned char beginning, unsigned char end) {
 
 int main(int argc, char *argv[]) {
   setlocale(LC_ALL, "");
-  Options options = {0, 0, 0};
+  Options options = {0, 0, 0, 0};
   int option;
 
   static struct option long_options[] = {{"no-wait", no_argument, 0, 'w'},
                                          {"unicode", no_argument, 0, 'u'},
+                                         {"lookup", no_argument, 0, 'l'},
                                          {"verbose", no_argument, 0, 'v'},
                                          {0, 0, 0, 0}};
 
@@ -312,11 +314,11 @@ int main(int argc, char *argv[]) {
     case 'w':
       options.no_wait = 1;
       break;
-    case 'u':
-      options.unicode = 1;
-      break;
     case 'v':
       options.verbose = 1;
+      break;
+    case 'l':
+      options.lookup = 1;
       break;
     case '?':
       fprintf(stderr, "Opzione non riconosciuta\n");
@@ -326,47 +328,67 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  pthread_t threads[COINS];
-  ThreadParams thread_params[COINS];
-
-  srand(time(NULL));
   Response response;
 
-  if (!options.no_wait) {
-    printf("Premi un tasto per lanciare le monete...");
-    fflush(stdout);
-  }
-  for (int i = 0; i < THROWS; i++) {
+  if (options.lookup) {
+    int counter = 0;
+    char input;
+
+    printf("Inserisci le sei somme: ");
+
+    while (counter < THROWS) {
+      input = getchar();
+      if (input >= '6' && input <= '9') {
+        printf("%c", input);
+        response.raw[counter] = input - '0';
+        counter++;
+      } else {
+        continue;
+      }
+    }
+  } else {
+
+    pthread_t threads[COINS];
+    ThreadParams thread_params[COINS];
+
+    srand(time(NULL));
+
     if (!options.no_wait) {
-      while (!kbhit()) {
-      }
-      if (!options.verbose) {
-        if (i == 0) {
-          printf("\033[2K\r");
+      printf("Premi un tasto per lanciare le monete...");
+      fflush(stdout);
+    }
+    for (int i = 0; i < THROWS; i++) {
+      if (!options.no_wait) {
+        while (!kbhit()) {
         }
-        printf("·");
+        if (!options.verbose) {
+          if (i == 0) {
+            printf("\033[2K\r");
+          }
+          printf("·");
+        }
+        getchar();
       }
-      getchar();
-    }
 
-    int sum = 0;
+      int sum = 0;
 
-    for (int j = 0; j < COINS; j++) {
-      thread_params[j].thread_data.thread_id = j;
-      thread_params[j].options = options;
-      pthread_create(&threads[j], NULL, throw_a_coin,
-                     (void *)&thread_params[j]);
-    }
+      for (int j = 0; j < COINS; j++) {
+        thread_params[j].thread_data.thread_id = j;
+        thread_params[j].options = options;
+        pthread_create(&threads[j], NULL, throw_a_coin,
+                       (void *)&thread_params[j]);
+      }
 
-    for (int j = 0; j < COINS; j++) {
-      pthread_join(threads[j], NULL);
-      sum += thread_params[j].thread_data.result;
-    }
+      for (int j = 0; j < COINS; j++) {
+        pthread_join(threads[j], NULL);
+        sum += thread_params[j].thread_data.result;
+      }
 
-    response.raw[i] = sum;
+      response.raw[i] = sum;
 
-    if (options.verbose) {
-      printf("La somma è: %d\n\n", sum);
+      if (options.verbose) {
+        printf("La somma è: %d\n\n", sum);
+      }
     }
   }
 
@@ -395,4 +417,3 @@ int main(int argc, char *argv[]) {
 
   return 0;
 }
-
