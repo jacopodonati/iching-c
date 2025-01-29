@@ -332,9 +332,19 @@ int main(int argc, char *argv[]) {
   srand(time(NULL));
   Response response;
 
+  if (!options.no_wait) {
+    printf("Premi un tasto per lanciare le monete...");
+    fflush(stdout);
+  }
   for (int i = 0; i < THROWS; i++) {
     if (!options.no_wait) {
       while (!kbhit()) {
+      }
+      if (!options.verbose) {
+        if (i == 0) {
+          printf("\033[2K\r");
+        }
+        printf("·");
       }
       getchar();
     }
@@ -360,6 +370,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  printf("\033[2K\r");
   response = split_hex(response);
   int beginning_number = get_hexagram_number(response.beginning);
   int beginning_hex = 0x4DBF + beginning_number;
